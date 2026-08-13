@@ -76,8 +76,9 @@ export function dijkstra(
     let current: string | null = null;
     let best = INF;
     for (const w of warehouses) {
-      if (!visited.has(w.id) && dist[w.id] < best) {
-        best = dist[w.id];
+      const d = dist[w.id] ?? INF;
+      if (!visited.has(w.id) && d < best) {
+        best = d;
         current = w.id;
       }
     }
@@ -87,9 +88,10 @@ export function dijkstra(
     const relaxed: DijkstraStep["relaxed"] = [];
     for (const { to, edge } of adj[current] ?? []) {
       if (visited.has(to)) continue;
-      const candidate = dist[current] + edgeWeight(edge, mode);
-      if (candidate < dist[to]) {
-        relaxed.push({ nodeId: to, from: current, oldDist: dist[to], newDist: candidate });
+      const candidate = (dist[current] ?? INF) + edgeWeight(edge, mode);
+      const currentTo = dist[to] ?? INF;
+      if (candidate < currentTo) {
+        relaxed.push({ nodeId: to, from: current, oldDist: currentTo, newDist: candidate });
         dist[to] = candidate;
         prev[to] = current;
       }
