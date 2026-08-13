@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 interface Props {
   targetWarehouseId: string;
   sourceWarehouseId?: string | null;
-  path?: string[];
-  step?: DijkstraStep | null;
+  path?: string[] | undefined;
+  step?: DijkstraStep | null | undefined;
   weightLabelMode: "time" | "distance";
   animationKey: number;
 }
