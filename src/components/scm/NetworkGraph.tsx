@@ -152,7 +152,7 @@ function WarehouseNode({
   visited: boolean;
   isCurrent: boolean;
   relaxed: boolean;
-  stepDist?: number;
+  stepDist?: number | undefined;
 }) {
   const { x, y } = w.position;
   const r = w.type === "central" ? 27 : 22;
