@@ -46,7 +46,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Mô phỏng điều chuyển hàng giữa các kho với thuật toán Dijkstra và ràng buộc hạn sử dụng tối thiểu khi tới nơi.",
+          "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Dijkstra và chọn lô theo FEFO.",
       },
     ],
   }),
