@@ -1,0 +1,234 @@
+export interface Warehouse {
+  id: string;
+  name: string;
+  shortName: string;
+  type: "central" | "branch";
+  position: { x: number; y: number };
+}
+
+export interface RouteEdge {
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  distanceKm: number;
+  transitTimeDays: number;
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  unit: string;
+  shelfLifeDays: number;
+}
+
+export interface Batch {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  batchCode: string;
+  quantity: number;
+  manufactureDate: string;
+  expiryDate: string;
+}
+
+/** Ngày "hôm nay" cố định để demo luôn cho kết quả giống nhau. */
+export const TODAY = new Date("2026-08-13T00:00:00.000Z");
+
+export function addDays(base: Date, days: number): Date {
+  return new Date(base.getTime() + days * 86400000);
+}
+
+function iso(offsetDays: number): string {
+  return addDays(TODAY, offsetDays).toISOString().slice(0, 10);
+}
+
+export function formatDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+export const warehouses: Warehouse[] = [
+  {
+    id: "W-HN",
+    name: "Kho Trung tâm Hà Nội",
+    shortName: "Hà Nội",
+    type: "central",
+    position: { x: 150, y: 90 },
+  },
+  {
+    id: "W-HP",
+    name: "Kho Chi nhánh Hải Phòng",
+    shortName: "Hải Phòng",
+    type: "branch",
+    position: { x: 380, y: 60 },
+  },
+  {
+    id: "W-DN",
+    name: "Kho Chi nhánh Đà Nẵng",
+    shortName: "Đà Nẵng",
+    type: "branch",
+    position: { x: 430, y: 215 },
+  },
+  {
+    id: "W-NT",
+    name: "Kho Chi nhánh Nha Trang",
+    shortName: "Nha Trang",
+    type: "branch",
+    position: { x: 470, y: 360 },
+  },
+  {
+    id: "W-HCM",
+    name: "Kho Trung tâm HCM",
+    shortName: "TP.HCM",
+    type: "central",
+    position: { x: 150, y: 400 },
+  },
+  {
+    id: "W-BD",
+    name: "Kho Chi nhánh Bình Dương",
+    shortName: "Bình Dương",
+    type: "branch",
+    position: { x: 290, y: 320 },
+  },
+  {
+    id: "W-CT",
+    name: "Kho Chi nhánh Cần Thơ",
+    shortName: "Cần Thơ",
+    type: "branch",
+    position: { x: 250, y: 495 },
+  },
+];
+
+export const routes: RouteEdge[] = [
+  { fromWarehouseId: "W-HN", toWarehouseId: "W-HP", distanceKm: 120, transitTimeDays: 0.5 },
+  { fromWarehouseId: "W-HN", toWarehouseId: "W-DN", distanceKm: 770, transitTimeDays: 2 },
+  { fromWarehouseId: "W-HP", toWarehouseId: "W-DN", distanceKm: 880, transitTimeDays: 3 },
+  { fromWarehouseId: "W-DN", toWarehouseId: "W-NT", distanceKm: 530, transitTimeDays: 1 },
+  { fromWarehouseId: "W-NT", toWarehouseId: "W-HCM", distanceKm: 430, transitTimeDays: 1.5 },
+  { fromWarehouseId: "W-NT", toWarehouseId: "W-CT", distanceKm: 600, transitTimeDays: 2.5 },
+  { fromWarehouseId: "W-HCM", toWarehouseId: "W-DN", distanceKm: 960, transitTimeDays: 2 },
+  { fromWarehouseId: "W-HCM", toWarehouseId: "W-BD", distanceKm: 30, transitTimeDays: 0.5 },
+  { fromWarehouseId: "W-HCM", toWarehouseId: "W-CT", distanceKm: 170, transitTimeDays: 1 },
+  { fromWarehouseId: "W-BD", toWarehouseId: "W-CT", distanceKm: 195, transitTimeDays: 1.2 },
+  { fromWarehouseId: "W-HN", toWarehouseId: "W-HCM", distanceKm: 1710, transitTimeDays: 3 },
+];
+
+export const products: Product[] = [
+  { id: "P1", sku: "SKU-MILK-1L", name: "Sữa tươi tiệt trùng 1L", unit: "thùng", shelfLifeDays: 45 },
+  { id: "P2", sku: "SKU-YOG-100", name: "Sữa chua có đường 100g", unit: "lốc", shelfLifeDays: 35 },
+  { id: "P3", sku: "SKU-BREAD-F", name: "Bánh mì tươi đóng gói", unit: "thùng", shelfLifeDays: 20 },
+  { id: "P4", sku: "SKU-JUICE-1L", name: "Nước ép trái cây 1L", unit: "thùng", shelfLifeDays: 60 },
+  { id: "P5", sku: "SKU-SOY-330", name: "Sữa hạt óc chó 330ml", unit: "thùng", shelfLifeDays: 50 },
+];
+
+type RawBatch = [
+  productId: string,
+  warehouseId: string,
+  code: string,
+  quantity: number,
+  expiryOffset: number,
+];
+
+const rawBatches: RawBatch[] = [
+  // ----- P1 Sữa tươi (45 ngày) -----
+  ["P1", "W-HCM", "LOT-M-1101", 200, 32],
+  ["P1", "W-HCM", "LOT-M-1102", 300, 40],
+  ["P1", "W-HCM", "LOT-M-1103", 150, 12],
+  ["P1", "W-BD", "LOT-M-1201", 120, 28],
+  ["P1", "W-BD", "LOT-M-1202", 80, 44],
+  ["P1", "W-NT", "LOT-M-1301", 500, 31],
+  ["P1", "W-HN", "LOT-M-1401", 400, 33],
+  ["P1", "W-CT", "LOT-M-1501", 20, 18],
+  ["P1", "W-DN", "LOT-M-1601", 60, 26],
+
+  // ----- P2 Sữa chua (35 ngày) -----
+  ["P2", "W-HCM", "LOT-Y-2101", 150, 38],
+  ["P2", "W-HCM", "LOT-Y-2102", 100, 30],
+  ["P2", "W-HN", "LOT-Y-2201", 200, 36],
+  ["P2", "W-HP", "LOT-Y-2301", 90, 33],
+  ["P2", "W-HP", "LOT-Y-2302", 140, 14],
+  ["P2", "W-NT", "LOT-Y-2401", 60, 34],
+  ["P2", "W-CT", "LOT-Y-2501", 300, 45],
+  ["P2", "W-DN", "LOT-Y-2601", 25, 9],
+  ["P2", "W-BD", "LOT-Y-2701", 110, 27],
+
+  // ----- P3 Bánh mì tươi (20 ngày) -----
+  ["P3", "W-HCM", "LOT-B-3101", 200, 18],
+  ["P3", "W-HN", "LOT-B-3201", 180, 16],
+  ["P3", "W-DN", "LOT-B-3301", 120, 20],
+  ["P3", "W-CT", "LOT-B-3401", 90, 15],
+  ["P3", "W-BD", "LOT-B-3501", 140, 11],
+  ["P3", "W-HP", "LOT-B-3601", 30, 7],
+
+  // ----- P4 Nước ép (60 ngày) -----
+  ["P4", "W-HCM", "LOT-J-4101", 260, 52],
+  ["P4", "W-HCM", "LOT-J-4102", 180, 21],
+  ["P4", "W-HN", "LOT-J-4201", 300, 47],
+  ["P4", "W-NT", "LOT-J-4301", 150, 39],
+  ["P4", "W-CT", "LOT-J-4401", 75, 34],
+  ["P4", "W-BD", "LOT-J-4501", 210, 58],
+
+  // ----- P5 Sữa hạt (50 ngày) -----
+  ["P5", "W-HN", "LOT-S-5101", 220, 44],
+  ["P5", "W-HP", "LOT-S-5201", 130, 37],
+  ["P5", "W-DN", "LOT-S-5301", 90, 25],
+  ["P5", "W-HCM", "LOT-S-5401", 340, 49],
+  ["P5", "W-BD", "LOT-S-5501", 160, 13],
+];
+
+const shelfLifeById = new Map(products.map((p) => [p.id, p.shelfLifeDays]));
+
+export const batches: Batch[] = rawBatches.map(
+  ([productId, warehouseId, batchCode, quantity, expiryOffset], i) => ({
+    id: `B${i + 1}`,
+    productId,
+    warehouseId,
+    batchCode,
+    quantity,
+    manufactureDate: iso(expiryOffset - (shelfLifeById.get(productId) ?? 30)),
+    expiryDate: iso(expiryOffset),
+  }),
+);
+
+export interface DemoScenario {
+  id: string;
+  label: string;
+  description: string;
+  targetWarehouseId: string;
+  productId: string;
+  quantity: number;
+  threshold: number;
+}
+
+export const demoScenarios: DemoScenario[] = [
+  {
+    id: "S1",
+    label: "Kịch bản mẫu 1",
+    description: "Chỉ 1 kho nguồn hợp lệ, tuyến đi trực tiếp",
+    targetWarehouseId: "W-CT",
+    productId: "P1",
+    quantity: 100,
+    threshold: 30,
+  },
+  {
+    id: "S2",
+    label: "Kịch bản mẫu 2",
+    description: "Nhiều kho khả thi, có lô bị loại vì HSD",
+    targetWarehouseId: "W-DN",
+    productId: "P2",
+    quantity: 80,
+    threshold: 30,
+  },
+  {
+    id: "S3",
+    label: "Kịch bản mẫu 3",
+    description: "Không có nguồn hàng phù hợp",
+    targetWarehouseId: "W-HP",
+    productId: "P3",
+    quantity: 50,
+    threshold: 30,
+  },
+];
+
+export const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
+export const productById = new Map(products.map((p) => [p.id, p]));
