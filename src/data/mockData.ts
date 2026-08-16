@@ -234,3 +234,80 @@ export const demoScenarios: DemoScenario[] = [
 
 export const warehouseById = new Map(warehouses.map((w) => [w.id, w]));
 export const productById = new Map(products.map((p) => [p.id, p]));
+
+/* ============================================================
+ * MODULE 2 — Đặt đơn hàng khách hàng (Vấn đề 3 & 4)
+ * ============================================================ */
+
+export interface OrderLocation {
+  id: string;
+  label: string;
+  position: { x: number; y: number };
+}
+
+export interface SalesOrder {
+  id: string;
+  orderLocationId: string;
+  productId: string;
+  quantity: number;
+}
+
+export interface PromotionRule {
+  /** Lô có HSD còn lại <= giá trị này (ngày) được đưa vào diện khuyến mãi. */
+  maxShelfLifeDaysForPromo: number;
+  discountPercent: number;
+}
+
+export const orderLocations: OrderLocation[] = [
+  { id: "OL1", label: "Điểm đặt đơn - Quận 7, TP.HCM", position: { x: 185, y: 425 } },
+  { id: "OL2", label: "Khách hàng khu vực Thủ Đức", position: { x: 275, y: 350 } },
+  { id: "OL3", label: "Đại lý Ninh Kiều, Cần Thơ", position: { x: 235, y: 520 } },
+];
+
+export const orderLocationById = new Map(orderLocations.map((o) => [o.id, o]));
+
+export const defaultPromotionRule: PromotionRule = {
+  maxShelfLifeDaysForPromo: 15,
+  discountPercent: 20,
+};
+
+export interface OrderScenario {
+  id: string;
+  label: string;
+  description: string;
+  orderLocationId: string;
+  productId: string;
+  quantity: number;
+}
+
+export const orderScenarios: OrderScenario[] = [
+  {
+    id: "A",
+    label: "Kịch bản A",
+    description: "Kho gần nhất đủ hàng, không có lô cận hạn",
+    orderLocationId: "OL3",
+    productId: "P2",
+    quantity: 200,
+  },
+  {
+    id: "B",
+    label: "Kịch bản B",
+    description: "Kho gần nhất hết hàng → Dijkstra tìm kho thay thế, so sánh 2 phương án",
+    orderLocationId: "OL2",
+    productId: "P2",
+    quantity: 300,
+  },
+  {
+    id: "C",
+    label: "Kịch bản C",
+    description: "Có cả lô tiêu chuẩn và lô khuyến mãi cận HSD",
+    orderLocationId: "OL1",
+    productId: "P1",
+    quantity: 100,
+  },
+];
+
+/** Quy đổi 1 đơn vị toạ độ trên sơ đồ ≈ 1.2 km thực tế (chỉ để minh hoạ). */
+export const KM_PER_UNIT = 1.2;
+/** Tốc độ giao chặng cuối: 400 km/ngày. */
+export const LAST_MILE_KM_PER_DAY = 400;
