@@ -19,6 +19,8 @@ export interface Product {
   name: string;
   unit: string;
   shelfLifeDays: number;
+  /** Giá bán lẻ 1 đơn vị (VND) — dùng cho module đơn hàng khách hàng. */
+  unitPrice: number;
 }
 
 export interface Batch {
@@ -114,11 +116,11 @@ export const routes: RouteEdge[] = [
 ];
 
 export const products: Product[] = [
-  { id: "P1", sku: "SKU-MILK-1L", name: "Sữa tươi tiệt trùng 1L", unit: "thùng", shelfLifeDays: 45 },
-  { id: "P2", sku: "SKU-YOG-100", name: "Sữa chua có đường 100g", unit: "lốc", shelfLifeDays: 35 },
-  { id: "P3", sku: "SKU-BREAD-F", name: "Bánh mì tươi đóng gói", unit: "thùng", shelfLifeDays: 20 },
-  { id: "P4", sku: "SKU-JUICE-1L", name: "Nước ép trái cây 1L", unit: "thùng", shelfLifeDays: 60 },
-  { id: "P5", sku: "SKU-SOY-330", name: "Sữa hạt óc chó 330ml", unit: "thùng", shelfLifeDays: 50 },
+  { id: "P1", sku: "SKU-MILK-1L", name: "Sữa tươi tiệt trùng 1L", unit: "thùng", shelfLifeDays: 45, unitPrice: 420000 },
+  { id: "P2", sku: "SKU-YOG-100", name: "Sữa chua có đường 100g", unit: "lốc", shelfLifeDays: 35, unitPrice: 32000 },
+  { id: "P3", sku: "SKU-BREAD-F", name: "Bánh mì tươi đóng gói", unit: "thùng", shelfLifeDays: 20, unitPrice: 180000 },
+  { id: "P4", sku: "SKU-JUICE-1L", name: "Nước ép trái cây 1L", unit: "thùng", shelfLifeDays: 60, unitPrice: 350000 },
+  { id: "P5", sku: "SKU-SOY-330", name: "Sữa hạt óc chó 330ml", unit: "thùng", shelfLifeDays: 50, unitPrice: 480000 },
 ];
 
 type RawBatch = [
