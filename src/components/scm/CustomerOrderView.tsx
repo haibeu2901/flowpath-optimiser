@@ -255,7 +255,7 @@ export function CustomerOrderView() {
                 </span>{" "}
                 — {formatNum(evaluation.nearest.distanceKm)} km
               </p>
-              <p className="mt-1">
+              <div className="mt-1">
                 {evaluation.nearestHasStock ? (
                   <Badge className="bg-success text-success-foreground hover:bg-success">
                     Đủ hàng — phục vụ trực tiếp
@@ -265,7 +265,7 @@ export function CustomerOrderView() {
                     Không đủ hàng (tồn {evaluation.nearest.totalStock}) — cần Dijkstra
                   </Badge>
                 )}
-              </p>
+              </div>
             </div>
 
             {evaluation.plans.length > 1 ? (
