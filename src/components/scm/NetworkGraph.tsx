@@ -11,6 +11,11 @@ interface Props {
   step?: DijkstraStep | null | undefined;
   weightLabelMode: "time" | "distance";
   animationKey: number;
+  /** Điểm đặt đơn của khách (module đơn hàng) */
+  orderPoint?: { label: string; position: { x: number; y: number } } | null | undefined;
+  /** Kho được nối nét đứt tới điểm đặt đơn (chặng giao cuối) */
+  lastMileWarehouseId?: string | null | undefined;
+  lastMileLabel?: string | undefined;
 }
 
 const WIDTH = 620;
@@ -35,6 +40,9 @@ export function NetworkGraph({
   step,
   weightLabelMode,
   animationKey,
+  orderPoint,
+  lastMileWarehouseId,
+  lastMileLabel,
 }: Props) {
   const hasPath = !!path && path.length > 1;
   const motionPath = hasPath
@@ -131,6 +139,57 @@ export function NetworkGraph({
           stepDist={step ? step.dist[w.id] : undefined}
         />
       ))}
+
+      {orderPoint && (
+        <g>
+          {lastMileWarehouseId && (
+            <g>
+              <line
+                x1={orderPoint.position.x}
+                y1={orderPoint.position.y}
+                x2={pos(lastMileWarehouseId).x}
+                y2={pos(lastMileWarehouseId).y}
+                className="stroke-warning"
+                strokeWidth={3}
+                strokeDasharray="7 6"
+              />
+              {lastMileLabel && (
+                <text
+                  x={(orderPoint.position.x + pos(lastMileWarehouseId).x) / 2}
+                  y={(orderPoint.position.y + pos(lastMileWarehouseId).y) / 2 - 6}
+                  textAnchor="middle"
+                  className="fill-warning text-[11px] font-bold"
+                >
+                  {lastMileLabel}
+                </text>
+              )}
+            </g>
+          )}
+          <circle
+            cx={orderPoint.position.x}
+            cy={orderPoint.position.y}
+            r={11}
+            className="fill-warning stroke-card"
+            strokeWidth={2}
+          />
+          <text
+            x={orderPoint.position.x}
+            y={orderPoint.position.y + 4}
+            textAnchor="middle"
+            className="fill-warning-foreground text-[10px] font-bold"
+          >
+            KH
+          </text>
+          <text
+            x={orderPoint.position.x}
+            y={orderPoint.position.y - 17}
+            textAnchor="middle"
+            className="fill-foreground text-[11px] font-semibold"
+          >
+            {orderPoint.label}
+          </text>
+        </g>
+      )}
     </svg>
   );
 }
