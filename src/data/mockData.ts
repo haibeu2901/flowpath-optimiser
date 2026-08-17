@@ -138,6 +138,7 @@ const rawBatches: RawBatch[] = [
   ["P1", "W-HCM", "LOT-M-1103", 150, 12],
   ["P1", "W-BD", "LOT-M-1201", 120, 28],
   ["P1", "W-BD", "LOT-M-1202", 80, 44],
+  ["P1", "W-BD", "LOT-M-1203", 200, 18],
   ["P1", "W-NT", "LOT-M-1301", 500, 31],
   ["P1", "W-HN", "LOT-M-1401", 400, 33],
   ["P1", "W-CT", "LOT-M-1501", 20, 18],
@@ -311,3 +312,175 @@ export const orderScenarios: OrderScenario[] = [
 export const KM_PER_UNIT = 1.2;
 /** Tốc độ giao chặng cuối: 400 km/ngày. */
 export const LAST_MILE_KM_PER_DAY = 400;
+/* ============================================================
+ * SMART FEFO — MRSL động, Hard Filter, Weighted Scoring
+ * ============================================================ */
+
+export interface SalesRecord {
+  date: string;
+  productId: string;
+  unitsSold: number;
+}
+
+export interface DemandNode {
+  id: string;
+  name: string;
+  type: "branch_warehouse" | "retailer";
+  position: { x: number; y: number };
+  /** Kho tương ứng (chỉ với type = branch_warehouse) */
+  warehouseId?: string;
+  salesHistory: SalesRecord[];
+  isColdStart: boolean;
+}
+
+export interface AllocationParams {
+  safetyBufferDays: number;
+  maxServingDistanceKm: number;
+  weightDistance: number;
+  weightExpiry: number;
+  coldStartMinShelfLifePercent: number;
+}
+
+export const defaultAllocationParams: AllocationParams = {
+  safetyBufferDays: 3,
+  maxServingDistanceKm: 150,
+  weightDistance: 0.4,
+  weightExpiry: 0.6,
+  coldStartMinShelfLifePercent: 50,
+};
+
+/** Tốc độ bán trung bình (đơn vị/ngày) dùng để sinh lịch sử bán hàng giả lập. */
+const baseVelocity: Record<string, Record<string, number>> = {
+  "DN-W-HP": { P1: 18, P2: 12, P3: 8, P5: 6 },
+  "DN-W-DN": { P1: 22, P2: 15, P3: 10, P5: 7 },
+  "DN-W-NT": { P1: 14, P2: 9, P4: 6 },
+  "DN-W-BD": { P1: 26, P2: 18, P3: 12, P4: 9 },
+  "DN-W-CT": { P1: 10, P2: 7, P3: 5, P4: 4 },
+  "DN-W-HN": { P1: 40, P2: 30, P3: 18, P5: 14 },
+  "DN-W-HCM": { P1: 45, P2: 32, P3: 20, P4: 16 },
+  "R-SUPER-Q7": { P1: 40, P2: 26, P4: 12 },
+  "R-TAPHOA-TD": { P1: 5, P2: 4, P3: 3 },
+  "R-CT-NINHKIEU": { P1: 12, P2: 8, P4: 5 },
+  "R-NEW-BD": {},
+};
+
+/** Sinh lịch sử 10 ngày gần nhất, dao động ±20% quanh tốc độ nền (tất định). */
+function makeHistory(nodeId: string): SalesRecord[] {
+  const map = baseVelocity[nodeId] ?? {};
+  const out: SalesRecord[] = [];
+  let seed = nodeId.length * 7 + 13;
+  for (const [productId, v] of Object.entries(map)) {
+    for (let d = 10; d >= 1; d--) {
+      seed = (seed * 1103515245 + 12345) % 2147483647;
+      const jitter = 0.8 + ((seed >>> 8) % 41) / 100; // 0.80 → 1.20
+      out.push({
+        date: iso(-d),
+        productId,
+        unitsSold: Math.max(1, Math.round(v * jitter)),
+      });
+    }
+  }
+  return out;
+}
+
+export const demandNodes: DemandNode[] = [
+  ...warehouses.map<DemandNode>((w) => ({
+    id: `DN-${w.id}`,
+    name: w.name,
+    type: "branch_warehouse",
+    position: w.position,
+    warehouseId: w.id,
+    salesHistory: makeHistory(`DN-${w.id}`),
+    isColdStart: false,
+  })),
+  {
+    id: "R-SUPER-Q7",
+    name: "Siêu thị lớn — Quận 7, TP.HCM",
+    type: "retailer",
+    position: { x: 185, y: 425 },
+    salesHistory: makeHistory("R-SUPER-Q7"),
+    isColdStart: false,
+  },
+  {
+    id: "R-TAPHOA-TD",
+    name: "Tạp hoá nhỏ — Thủ Đức (bán chậm)",
+    type: "retailer",
+    position: { x: 275, y: 350 },
+    salesHistory: makeHistory("R-TAPHOA-TD"),
+    isColdStart: false,
+  },
+  {
+    id: "R-CT-NINHKIEU",
+    name: "Đại lý Ninh Kiều — Cần Thơ",
+    type: "retailer",
+    position: { x: 235, y: 520 },
+    salesHistory: makeHistory("R-CT-NINHKIEU"),
+    isColdStart: false,
+  },
+  {
+    id: "R-NEW-BD",
+    name: "Đại lý mới mở — Bình Dương (chưa có lịch sử)",
+    type: "retailer",
+    position: { x: 330, y: 300 },
+    salesHistory: [],
+    isColdStart: true,
+  },
+];
+
+export const demandNodeById = new Map(demandNodes.map((n) => [n.id, n]));
+export const retailerNodes = demandNodes.filter((n) => n.type === "retailer");
+
+export interface SmartScenario {
+  id: string;
+  label: string;
+  description: string;
+  demandNodeId: string;
+  productId: string;
+  quantity: number;
+  /** Các đơn khác cùng chuyến xe (bước 11 — Delivery Routing) */
+  companionOrders?: { demandNodeId: string; productId: string; quantity: number }[];
+}
+
+export const smartScenarios: SmartScenario[] = [
+  {
+    id: "D",
+    label: "D · FEFO mù quáng vs Smart FEFO",
+    description:
+      "Đại lý bán chậm: lô cận date nhất bị Hard Filter loại vì không đủ MRSL, Smart FEFO chọn lô khác",
+    demandNodeId: "R-TAPHOA-TD",
+    productId: "P1",
+    quantity: 100,
+  },
+  {
+    id: "E",
+    label: "E · Split Shipment",
+    description: "Đơn lớn, không kho đơn lẻ nào đủ hàng → tách 2 kho, tính Effective MRSL",
+    demandNodeId: "R-SUPER-Q7",
+    productId: "P2",
+    quantity: 420,
+  },
+  {
+    id: "F",
+    label: "F · Cold Start",
+    description: "Đại lý mới chưa có lịch sử bán → áp luật tĩnh còn > 50% tuổi đời",
+    demandNodeId: "R-NEW-BD",
+    productId: "P1",
+    quantity: 60,
+  },
+  {
+    id: "G",
+    label: "G · Nhiều đơn cùng chuyến",
+    description: "3 đơn gộp 1 chuyến xe → nearest-neighbor sắp thứ tự điểm dừng (VRP rút gọn)",
+    demandNodeId: "R-SUPER-Q7",
+    productId: "P1",
+    quantity: 80,
+    companionOrders: [
+      { demandNodeId: "R-TAPHOA-TD", productId: "P1", quantity: 30 },
+      { demandNodeId: "R-CT-NINHKIEU", productId: "P1", quantity: 40 },
+    ],
+  },
+];
+
+/** Tốc độ xe tải trung bình dùng để ước lượng ETA từ khoảng cách Haversine. */
+export const TRUCK_KMH = 45;
+export const TRUCK_HOURS_PER_DAY = 10;
