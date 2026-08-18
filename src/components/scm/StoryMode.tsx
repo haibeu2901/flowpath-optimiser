@@ -4,63 +4,77 @@ import { Button } from "@/components/ui/button";
 
 const slides: { title: string; body: React.ReactNode }[] = [
   {
-    title: "1. Đặt vấn đề",
+    title: "1. Đặt vấn đề — \u201cFEFO mù quáng\u201d",
     body: (
-      <ul className="space-y-2 text-lg">
-        <li>① Kho chi nhánh thiếu hàng → cần luân chuyển từ kho khác trong mạng lưới.</li>
-        <li>② Hàng FMCG hạn sử dụng ngắn → tuyến vận chuyển càng dài, HSD còn lại càng ít.</li>
-        <li>③ Đơn hàng của nhân viên kinh doanh cần được phục vụ từ kho gần nhất còn hàng.</li>
+      <ul className="space-y-3 text-lg">
         <li>
-          ④ Mâu thuẫn lợi ích: doanh nghiệp muốn xuất lô cũ trước (FEFO) để giảm lãng phí, khách
-          hàng lại muốn nhận lô HSD dài nhất.
+          FEFO truyền thống luôn xuất lô cận date nhất cho bất kỳ đại lý nào đang có đơn, bất kể đại
+          lý đó bán nhanh hay chậm.
+        </li>
+        <li>
+          Hệ quả: rủi ro hết hạn bị đẩy từ nhà phân phối xuống thẳng đại lý — tạp hoá bán 5
+          thùng/ngày nhận lô còn 10 ngày thì hàng hết hạn ngay trên kệ.
+        </li>
+        <li className="rounded-lg bg-secondary p-3 font-semibold">
+          Bài toán thực sự: <em>Lô nào, từ kho nào, nên giao cho đại lý nào</em> — để vừa giảm rủi
+          ro hết hạn ở nhà phân phối, vừa đảm bảo đại lý đủ thời gian bán hết, vừa không vận chuyển
+          quá xa, vừa tối ưu số chuyến xe?
         </li>
       </ul>
     ),
   },
   {
-    title: "2. Kiến trúc giải pháp",
+    title: "2. Lời giải — MRSL động thay ngưỡng cứng",
     body: (
-      <pre className="overflow-x-auto rounded-lg bg-secondary p-4 text-sm leading-relaxed">
-{`Đặt đơn (vị trí NVKD)
-      │
-      ▼
-Chọn kho gần nhất  ──(khoảng cách Euclidean)
-      │
-      ▼
-Kiểm tra tồn kho ── đủ ──────────────┐
-      │ thiếu                        │
-      ▼                              │
-Dijkstra tìm kho thay thế            │
-   ├─ (a) giao thẳng từ kho đó       │
-   └─ (b) điều chuyển về kho gần ────┤
-                                     ▼
-                        Chọn lô hàng cho khách
-                   ├─ Lô tiêu chuẩn: HSD dài nhất
-                   └─ Lô khuyến mãi: cận HSD, giảm giá
-                                     ▼
-                             Xác nhận đơn hàng`}
-      </pre>
-    ),
-  },
-  {
-    title: "3. Demo tương tác 1 — Luân chuyển kho nội bộ",
-    body: (
-      <ul className="space-y-2 text-lg">
-        <li>Chọn kho đang thiếu hàng, SKU và số lượng cần.</li>
-        <li>Dijkstra chạy trên mạng lưới kho, mô phỏng được từng bước.</li>
-        <li>FEFO chọn lô hết hạn sớm nhất nhưng vẫn đạt ngưỡng HSD tối thiểu khi tới nơi.</li>
-        <li>Các lô bị loại đều có lý do rõ ràng (HSD, số lượng, không có tuyến).</li>
+      <ul className="space-y-3 text-lg">
+        <li>
+          <span className="font-mono text-base">
+            MRSL = (Order_Qty / Sales_Velocity) + Safety_Buffer
+          </span>{" "}
+          — ngưỡng HSD tối thiểu tính riêng cho từng đại lý theo tốc độ bán thực tế.
+        </li>
+        <li>
+          Tách đơn: <span className="font-mono text-base">Effective_MRSL = ((Inventory_Ahead + Qty) / Velocity) + Buffer</span>
+        </li>
+        <li>Cold Start: đại lý mới chưa có lịch sử → luật tĩnh &ldquo;còn &gt; 50% tuổi đời&rdquo;.</li>
       </ul>
     ),
   },
   {
-    title: "4. Demo tương tác 2 — Đặt đơn hàng khách hàng",
+    title: "3. Kiến trúc — pipeline 11 bước",
     body: (
-      <ul className="space-y-2 text-lg">
-        <li>Chọn kho phục vụ theo khoảng cách tới điểm đặt đơn.</li>
-        <li>Kho gần nhất hết hàng → Dijkstra tìm kho thay thế, so sánh 2 phương án xử lý.</li>
-        <li>Chọn lô theo yêu cầu khách: mặc định HSD dài nhất.</li>
-        <li>Lô cận hạn được gắn khuyến mãi để khách chủ động lựa chọn.</li>
+      <pre className="overflow-x-auto rounded-lg bg-secondary p-4 text-sm leading-relaxed">
+{`1  Candidate Warehouse Discovery
+2  Candidate Batch / Lot
+3  Base MRSL  (hoặc luật Cold Start)
+4  Delivery ETA + Consumption Simulation
+5  HARD FILTER  ── Max_Serving_Distance (Haversine, O(1))
+                └─ HSD khi tới nơi ≥ MRSL
+6  Normalize (Min-Max 0-100, Max=Min → 50)
+7  Weighted Scoring = W_D*Norm_D + W_E*Norm_E   (thấp = tốt)
+8  Select Best Plan
+9  FEFO Depletion (trừ tồn kho)
+10 Optimistic Locking
+11 Delivery Routing — nearest-neighbor + Dijkstra (VRP rút gọn)`}
+      </pre>
+    ),
+  },
+  {
+    title: "4. Ranh giới thuật toán",
+    body: (
+      <ul className="space-y-3 text-lg">
+        <li>
+          <strong>Chọn kho nguồn:</strong> Haversine O(1) — không dùng Dijkstra để tránh nghẽn cổ
+          chai O(V²) khi mạng lưới kho lớn.
+        </li>
+        <li>
+          <strong>Giao hàng:</strong> Dijkstra trên graph mạng lưới, kết hợp nearest-neighbor để
+          xếp thứ tự điểm dừng cho một chuyến xe.
+        </li>
+        <li className="text-base text-muted-foreground">
+          Minh bạch phạm vi: đây là mô phỏng đơn giản hoá của VRP (không ràng buộc tải trọng, không
+          time-window).
+        </li>
       </ul>
     ),
   },
@@ -68,10 +82,10 @@ Dijkstra tìm kho thay thế            │
     title: "5. Giá trị mang lại",
     body: (
       <ul className="space-y-2 text-lg">
-        <li>Giảm lãng phí hàng hạn ngắn nhờ FEFO nội bộ + khuyến mãi cận HSD.</li>
-        <li>Tối ưu thời gian và chi phí vận chuyển nhờ Dijkstra trên mạng lưới kho.</li>
-        <li>Cải thiện trải nghiệm khách hàng: ưu tiên HSD dài, minh bạch lựa chọn giá.</li>
-        <li>Mọi quyết định đều được ghi lại trong Nhật ký quyết định — không phải hộp đen.</li>
+        <li>Giảm hàng hết hạn ở cả nhà phân phối lẫn đại lý — không đẩy rủi ro xuống hạ nguồn.</li>
+        <li>Ngưỡng an toàn thích ứng theo từng đại lý, chỉnh được qua tham số chính sách.</li>
+        <li>Điểm số kết hợp khoảng cách và độ cận date: giải phóng hàng cũ mà vẫn giao gần.</li>
+        <li>Pipeline 11 bước hiển thị tường minh — không phải hộp đen.</li>
       </ul>
     ),
   },
