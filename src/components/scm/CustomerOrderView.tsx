@@ -1,20 +1,21 @@
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   BadgePercent,
   CheckCircle2,
-  Clock,
+  Gauge,
+  Lock,
   MapPin,
   Package,
-  Search,
+  Route as RouteIcon,
   ShoppingCart,
-  Truck,
+  Split,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -23,91 +24,75 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-import { DecisionLog } from "@/components/scm/DecisionLog";
 import { NetworkGraph } from "@/components/scm/NetworkGraph";
+import { ParamsPanel } from "@/components/scm/ParamsPanel";
+import { PipelineVisualizer } from "@/components/scm/PipelineVisualizer";
+import { PlanTable } from "@/components/scm/PlanTable";
 import {
+  defaultAllocationParams,
   defaultPromotionRule,
   formatDate,
-  orderLocations,
-  orderScenarios,
   productById,
   products,
+  retailerNodes,
+  smartScenarios,
   warehouseById,
+  warehouses,
+  type AllocationParams,
 } from "@/data/mockData";
-import {
-  evaluateOrder,
-  formatVnd,
-  selectBatchesForCustomer,
-  type BatchChoice,
-} from "@/lib/order-algorithm";
 import { formatNum } from "@/lib/scm-algorithm";
-import { cn } from "@/lib/utils";
+import { allocate, formatVnd, haversineKm } from "@/lib/smart-fefo";
 
-const DEFAULTS = { orderLocationId: "OL1", productId: "P1", quantity: 100 };
+const DEFAULTS = { demandNodeId: "R-TAPHOA-TD", productId: "P1", quantity: 100 };
 
 export function CustomerOrderView() {
-  const [orderLocationId, setOrderLocationId] = useState(DEFAULTS.orderLocationId);
+  const [demandNodeId, setDemandNodeId] = useState(DEFAULTS.demandNodeId);
   const [productId, setProductId] = useState(DEFAULTS.productId);
   const [quantity, setQuantity] = useState(DEFAULTS.quantity);
-  const [promoThreshold, setPromoThreshold] = useState(
-    defaultPromotionRule.maxShelfLifeDaysForPromo,
-  );
-  const [discount, setDiscount] = useState(defaultPromotionRule.discountPercent);
-  const [planKind, setPlanKind] = useState<string>("");
-  const [choice, setChoice] = useState<"standard" | "promo">("standard");
+  const [params, setParams] = useState<AllocationParams>(defaultAllocationParams);
+  const [companions, setCompanions] = useState<
+    { demandNodeId: string; productId: string; quantity: number }[]
+  >([]);
 
-  const promotionRule = useMemo(
-    () => ({ maxShelfLifeDaysForPromo: promoThreshold, discountPercent: discount }),
-    [promoThreshold, discount],
+  const result = useMemo(
+    () => allocate({ demandNodeId, productId, quantity, params, companionOrders: companions }),
+    [demandNodeId, productId, quantity, params, companions],
   );
 
-  const evaluation = useMemo(
-    () => evaluateOrder({ orderLocationId, productId, quantity, promotionRule }),
-    [orderLocationId, productId, quantity, promotionRule],
-  );
+  const product = productById.get(productId)!;
+  const node = result.node;
 
-  const plan =
-    evaluation.plans.find((p) => p.kind === planKind) ?? evaluation.plans[0] ?? null;
+  const nearestWarehouseId = useMemo(() => {
+    return [...warehouses].sort(
+      (a, b) => haversineKm(a.position, node.position) - haversineKm(b.position, node.position),
+    )[0]!.id;
+  }, [node]);
 
-  const selection = useMemo(
-    () =>
-      plan
-        ? selectBatchesForCustomer({
-            warehouseId: plan.servingWarehouseId,
-            productId,
-            quantity,
-            deliveryDays: plan.totalDays,
-            promotionRule,
-          })
-        : null,
-    [plan, productId, quantity, promotionRule],
-  );
+  const servingId = result.best?.warehouseId ?? result.split?.[0]?.plan.warehouseId ?? null;
 
-  const picked: BatchChoice | null =
-    choice === "promo" && selection?.promo ? selection.promo : (selection?.standard ?? null);
-
-  const product = productById.get(productId);
-  const log = [...evaluation.log, ...(selection?.log ?? [])];
+  // Giá: lô cận date được giảm giá để khuyến khích tiêu thụ sớm.
+  const chosen = result.best;
+  const isPromo =
+    !!chosen && chosen.remainingOnArrival <= defaultPromotionRule.maxShelfLifeDaysForPromo;
+  const unitPrice = isPromo
+    ? Math.round(product.unitPrice * (1 - defaultPromotionRule.discountPercent / 100))
+    : product.unitPrice;
 
   function applyScenario(id: string) {
-    const s = orderScenarios.find((x) => x.id === id);
+    const s = smartScenarios.find((x) => x.id === id);
     if (!s) return;
-    setOrderLocationId(s.orderLocationId);
+    setDemandNodeId(s.demandNodeId);
     setProductId(s.productId);
     setQuantity(s.quantity);
-    setPlanKind("");
-    setChoice("standard");
+    setCompanions(s.companionOrders ?? []);
   }
 
   function reset() {
-    setOrderLocationId(DEFAULTS.orderLocationId);
+    setDemandNodeId(DEFAULTS.demandNodeId);
     setProductId(DEFAULTS.productId);
     setQuantity(DEFAULTS.quantity);
-    setPromoThreshold(defaultPromotionRule.maxShelfLifeDaysForPromo);
-    setDiscount(defaultPromotionRule.discountPercent);
-    setPlanKind("");
-    setChoice("standard");
+    setParams(defaultAllocationParams);
+    setCompanions([]);
   }
 
   return (
@@ -116,49 +101,45 @@ export function CustomerOrderView() {
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <MapPin className="size-4" /> Điểm đặt đơn &amp; kho phục vụ
+              <MapPin className="size-4" /> Điểm nhận hàng &amp; kho nguồn được chọn
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-xl border border-border bg-card p-2">
               <NetworkGraph
-                targetWarehouseId={evaluation.nearest.warehouseId}
-                sourceWarehouseId={plan ? plan.servingWarehouseId : null}
-                path={plan?.transferPath.length ? plan.transferPath : undefined}
-                weightLabelMode="time"
+                targetWarehouseId={nearestWarehouseId}
+                sourceWarehouseId={servingId}
+                weightLabelMode="distance"
                 animationKey={0}
-                orderPoint={{
-                  label: evaluation.orderLocation.label,
-                  position: evaluation.orderLocation.position,
-                }}
-                lastMileWarehouseId={plan?.lastMileFromWarehouseId ?? null}
+                orderPoint={{ label: node.name, position: node.position }}
+                lastMileWarehouseId={servingId}
                 lastMileLabel={
-                  plan
-                    ? `${formatNum(plan.lastMileKm)} km · ${formatNum(plan.lastMileDays)} ngày`
+                  result.best
+                    ? `${formatNum(result.best.distanceKm)} km · ETA ${formatNum(result.best.etaDays)} ngày`
                     : undefined
                 }
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Nét đứt màu cam = chặng giao cuối tới khách. Nét liền đậm = tuyến điều chuyển nội bộ
-              (Dijkstra) nếu phương án có điều chuyển.
+              Chọn kho nguồn bằng <strong>Haversine O(1)</strong> (nét đứt cam = chặng giao thực
+              tế). Dijkstra chỉ dùng ở bước 11 — Delivery Routing.
             </p>
           </CardContent>
         </Card>
 
-        <DecisionLog entries={log} />
+        <PipelineVisualizer steps={result.steps} />
       </div>
 
       <div className="space-y-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShoppingCart className="size-4" /> Bước 1 — Nhập đơn hàng
+              <ShoppingCart className="size-4" /> Đơn hàng
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              {orderScenarios.map((s) => (
+              {smartScenarios.map((s) => (
                 <Button
                   key={s.id}
                   variant="outline"
@@ -175,15 +156,21 @@ export function CustomerOrderView() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Điểm đặt đơn (nhân viên kinh doanh)</Label>
-              <Select value={orderLocationId} onValueChange={setOrderLocationId}>
+              <Label>Đại lý / điểm nhận hàng</Label>
+              <Select
+                value={demandNodeId}
+                onValueChange={(v) => {
+                  setDemandNodeId(v);
+                  setCompanions([]);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {orderLocations.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.label}
+                  {retailerNodes.map((n) => (
+                    <SelectItem key={n.id} value={n.id}>
+                      {n.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -204,206 +191,158 @@ export function CustomerOrderView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Số lượng khách đặt</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Ngưỡng khuyến mãi: ≤ {promoThreshold} ngày</Label>
-                <Slider
-                  value={[promoThreshold]}
-                  min={0}
-                  max={45}
-                  step={1}
-                  onValueChange={(v) => setPromoThreshold(v[0] ?? 15)}
-                  className="pt-3"
-                />
-              </div>
-              <div className="col-span-2 space-y-1.5">
-                <Label>Mức giảm giá cận HSD: {discount}%</Label>
-                <Slider
-                  value={[discount]}
-                  min={0}
-                  max={50}
-                  step={5}
-                  onValueChange={(v) => setDiscount(v[0] ?? 20)}
-                  className="pt-3"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Số lượng đặt ({product.unit})</Label>
+              <Input
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+              />
             </div>
+            {companions.length > 0 && (
+              <p className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs">
+                <RouteIcon className="size-3.5" /> Gộp chuyến với {companions.length} đơn khác — xem
+                bước 11.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Search className="size-4" /> Bước 2 &amp; 3 — Kho phục vụ
+              <Gauge className="size-4" /> MRSL — ngưỡng HSD động theo đại lý
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border p-3 text-sm">
-              <p>
-                <span className="text-muted-foreground">Kho gần nhất: </span>
-                <span className="font-semibold">
-                  {warehouseById.get(evaluation.nearest.warehouseId)?.name}
-                </span>{" "}
-                — {formatNum(evaluation.nearest.distanceKm)} km
-              </p>
-              <div className="mt-1">
-                {evaluation.nearestHasStock ? (
-                  <Badge className="bg-success text-success-foreground hover:bg-success">
-                    Đủ hàng — phục vụ trực tiếp
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive">
-                    Không đủ hàng (tồn {evaluation.nearest.totalStock}) — cần Dijkstra
-                  </Badge>
+          <CardContent className="space-y-3 text-sm">
+            {result.mrsl.mode === "cold-start" ? (
+              <Badge className="gap-1 whitespace-normal bg-warning text-left text-warning-foreground hover:bg-warning">
+                <AlertTriangle className="size-3.5 shrink-0" /> Đại lý mới — áp dụng luật an toàn
+                tĩnh (còn &gt; {params.coldStartMinShelfLifePercent}% HSD)
+              </Badge>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Info
+                  label="Sales Velocity"
+                  value={`${formatNum(result.mrsl.velocity)} ${product.unit}/ngày`}
+                />
+                <Info label="Safety Buffer" value={`${params.safetyBufferDays} ngày`} />
+              </div>
+            )}
+            <p className="rounded-md bg-secondary px-3 py-2 font-mono text-xs">
+              {result.mrsl.formula}
+            </p>
+            {result.blindFefo && (
+              <div
+                className={
+                  result.blindFefoViolates
+                    ? "rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs"
+                    : "rounded-lg border border-border p-3 text-xs"
+                }
+              >
+                <p className="font-semibold">FEFO mù quáng chọn: {result.blindFefo.batch.batchCode}</p>
+                <p className="text-muted-foreground">
+                  HSD khi tới nơi {formatNum(result.blindFefo.remainingOnArrival)} ngày —{" "}
+                  {result.blindFefoViolates
+                    ? `vi phạm ngưỡng ${formatNum(result.mrsl.requiredDays)} ngày, hàng sẽ hết hạn trên kệ đại lý.`
+                    : "trường hợp này vẫn đạt ngưỡng an toàn."}
+                </p>
+                {result.best && (
+                  <p className="mt-1 font-semibold text-success">
+                    Smart FEFO chọn: {result.best.batch.batchCode} (
+                    {formatNum(result.best.remainingOnArrival)} ngày HSD khi tới nơi).
+                  </p>
                 )}
               </div>
-            </div>
-
-            {evaluation.plans.length > 1 ? (
-              <RadioGroup
-                value={plan?.kind ?? ""}
-                onValueChange={(v) => setPlanKind(v)}
-                className="space-y-2"
-              >
-                {evaluation.plans.map((p) => (
-                  <label
-                    key={p.kind}
-                    className={cn(
-                      "flex cursor-pointer gap-3 rounded-lg border p-3 text-sm transition",
-                      plan?.kind === p.kind ? "border-primary bg-primary/5" : "border-border",
-                    )}
-                  >
-                    <RadioGroupItem value={p.kind} className="mt-1" />
-                    <div className="space-y-1">
-                      <p className="font-semibold">{p.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Kho xuất: {warehouseById.get(p.servingWarehouseId)?.shortName} · Tổng{" "}
-                        {formatNum(p.totalDays)} ngày · {formatNum(p.totalKm)} km
-                      </p>
-                      <p className="text-xs">{p.tradeOff}</p>
-                    </div>
-                  </label>
-                ))}
-              </RadioGroup>
-            ) : evaluation.plans.length === 1 ? (
-              <p className="text-sm text-muted-foreground">
-                {evaluation.plans[0]!.tradeOff} Tổng thời gian giao:{" "}
-                {formatNum(evaluation.plans[0]!.totalDays)} ngày.
-              </p>
-            ) : (
-              <p className="text-sm font-medium text-destructive">
-                Không kho nào có lô đủ số lượng cho đơn hàng này.
-              </p>
             )}
           </CardContent>
         </Card>
 
-        {selection && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="size-4" /> Bước 4 — Chọn lô hàng giao khách
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {selection.standard && (
-                  <BatchCard
-                    title="Lô tiêu chuẩn"
-                    subtitle="HSD dài nhất — theo yêu cầu khách hàng"
-                    choice={selection.standard}
-                    quantity={quantity}
-                    unit={product?.unit ?? ""}
-                    selected={choice === "standard"}
-                    onSelect={() => setChoice("standard")}
-                  />
-                )}
-                {selection.promo ? (
-                  <BatchCard
-                    title="Lô khuyến mãi"
-                    subtitle="Cận HSD — giảm giá để giảm lãng phí"
-                    choice={selection.promo}
-                    quantity={quantity}
-                    unit={product?.unit ?? ""}
-                    selected={choice === "promo"}
-                    onSelect={() => setChoice("promo")}
-                    promo
-                  />
-                ) : (
-                  <div className="flex items-center rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-                    Không có lô cận hạn tại kho này (ngưỡng ≤ {promoThreshold} ngày).
-                  </div>
-                )}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Package className="size-4" /> So sánh Plan sau Hard Filter
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <PlanTable result={result} />
+            {result.split && (
+              <div className="space-y-2 rounded-lg border border-warning/50 bg-warning/5 p-3">
+                <Badge className="gap-1 bg-warning text-warning-foreground hover:bg-warning">
+                  <Split className="size-3.5" /> Split Shipment — tách {result.split.length} kho
+                </Badge>
+                {result.split.map((l) => (
+                  <p key={l.plan.id} className="text-xs">
+                    <span className="font-semibold">
+                      {warehouseById.get(l.plan.warehouseId)?.shortName} · {l.plan.batch.batchCode}
+                    </span>{" "}
+                    — giao {l.qty} {product.unit}, Inventory_Ahead {l.inventoryAhead}, Effective
+                    MRSL {formatNum(l.effectiveMrsl)} ngày, HSD tới nơi{" "}
+                    {formatNum(l.plan.remainingOnArrival)} ngày ·{" "}
+                    <span className={l.ok ? "font-semibold text-success" : "font-semibold text-destructive"}>
+                      {l.ok ? "ĐẠT" : "LOẠI"}
+                    </span>
+                  </p>
+                ))}
               </div>
-              {selection.standard && selection.promo && (
-                <p className="rounded-lg bg-secondary/50 p-3 text-xs">
-                  Chênh lệch: khách nhận ít hơn{" "}
-                  <span className="font-semibold text-destructive">
-                    {formatNum(
-                      selection.standard.remainingShelfLifeOnDelivery -
-                        selection.promo.remainingShelfLifeOnDelivery,
-                    )}{" "}
-                    ngày HSD
-                  </span>{" "}
-                  nhưng tiết kiệm{" "}
-                  <span className="font-semibold text-success">
-                    {formatVnd(selection.standard.totalPrice - selection.promo.totalPrice)}
-                  </span>
-                  .
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
-        {plan && picked && (
+        {chosen ? (
           <Card className="border-success/40 bg-success/5">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base text-success">
-                <CheckCircle2 className="size-5" /> Bước 5 — Xác nhận đơn hàng
+                <CheckCircle2 className="size-5" /> Xác nhận đơn hàng
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <Info label="Kho phục vụ" value={warehouseById.get(plan.servingWarehouseId)?.name} />
-                <Info label="Phương án" value={plan.label} />
+                <Info label="Kho xuất" value={warehouseById.get(chosen.warehouseId)?.name} />
+                <Info label="Lô hàng" value={chosen.batch.batchCode} />
                 <Info
-                  label="Thời gian giao"
-                  value={`${formatNum(plan.totalDays)} ngày · ${formatNum(plan.totalKm)} km`}
+                  label="Giao hàng"
+                  value={`${formatNum(chosen.distanceKm)} km · ETA ${formatNum(chosen.etaDays)} ngày`}
                 />
-                <Info label="Lô hàng" value={picked.batch.batchCode} />
-                <Info label="HSD lô" value={formatDate(picked.batch.expiryDate)} />
+                <Info label="HSD lô" value={formatDate(chosen.batch.expiryDate)} />
                 <Info
-                  label="HSD còn lại khi giao"
-                  value={`${formatNum(picked.remainingShelfLifeOnDelivery)} ngày`}
+                  label="HSD khi tới nơi"
+                  value={`${formatNum(chosen.remainingOnArrival)} ngày (MRSL ${formatNum(result.mrsl.requiredDays)})`}
                 />
+                <Info label="Score" value={formatNum(chosen.score)} />
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
-                  <Truck className="size-4" /> {quantity} {product?.unit} × {formatVnd(picked.finalUnitPrice)}
-                  {picked.isPromo && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Lock className="size-3" /> Đã khoá tồn kho
+                  </Badge>
+                  {isPromo && (
                     <Badge className="gap-1 bg-warning text-warning-foreground hover:bg-warning">
-                      <BadgePercent className="size-3" /> -{picked.discountPercent}%
+                      <BadgePercent className="size-3" /> -{defaultPromotionRule.discountPercent}%
+                      cận date
                     </Badge>
                   )}
                 </span>
                 <span className="text-xl font-bold text-success">
-                  {formatVnd(picked.totalPrice)}
+                  {formatVnd(unitPrice * quantity)}
                 </span>
               </div>
             </CardContent>
           </Card>
+        ) : (
+          !result.split && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-6 text-sm font-medium text-destructive">
+                Không có phương án nào thoả cả ràng buộc logistics lẫn ràng buộc MRSL — hệ thống từ
+                chối giao thay vì đẩy rủi ro hết hạn xuống đại lý.
+              </CardContent>
+            </Card>
+          )
         )}
+
+        <ParamsPanel params={params} onChange={setParams} />
       </div>
     </div>
   );
@@ -415,66 +354,5 @@ function Info({ label, value }: { label: string; value?: string | undefined }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-semibold">{value}</p>
     </div>
-  );
-}
-
-function BatchCard({
-  title,
-  subtitle,
-  choice,
-  quantity,
-  unit,
-  selected,
-  onSelect,
-  promo,
-}: {
-  title: string;
-  subtitle: string;
-  choice: BatchChoice;
-  quantity: number;
-  unit: string;
-  selected: boolean;
-  onSelect: () => void;
-  promo?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "rounded-xl border p-3 text-left transition",
-        selected
-          ? promo
-            ? "border-warning bg-warning/10"
-            : "border-primary bg-primary/5"
-          : "border-border hover:bg-secondary/50",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold">{title}</p>
-        {promo && (
-          <Badge className="gap-1 bg-warning text-warning-foreground hover:bg-warning">
-            <BadgePercent className="size-3" /> Giảm giá do cận HSD
-          </Badge>
-        )}
-      </div>
-      <p className="text-xs text-muted-foreground">{subtitle}</p>
-      <p className="mt-2 font-mono text-sm">{choice.batch.batchCode}</p>
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Clock className="size-3" /> HSD khi giao:{" "}
-        {formatNum(choice.remainingShelfLifeOnDelivery)} ngày · {formatDate(choice.batch.expiryDate)}
-      </p>
-      <p className="mt-2 text-lg font-bold">
-        {formatVnd(choice.totalPrice)}
-        {choice.discountPercent > 0 && (
-          <span className="ml-2 text-xs font-normal text-muted-foreground line-through">
-            {formatVnd(choice.unitPrice * quantity)}
-          </span>
-        )}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        {quantity} {unit} × {formatVnd(choice.finalUnitPrice)}
-      </p>
-    </button>
   );
 }

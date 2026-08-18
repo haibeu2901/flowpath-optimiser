@@ -138,7 +138,7 @@ export type StepStatus = "ok" | "warn" | "fail" | "info";
 
 export interface StepRow {
   cells: (string | number)[];
-  tone?: "ok" | "fail" | "best";
+  tone?: "ok" | "fail" | "best" | undefined;
 }
 
 export interface PipelineStep {
@@ -147,7 +147,7 @@ export interface PipelineStep {
   status: StepStatus;
   summary: string;
   formula?: string;
-  bullets?: string[];
+  bullets?: string[] | undefined;
   table?: { head: string[]; rows: StepRow[] };
 }
 
