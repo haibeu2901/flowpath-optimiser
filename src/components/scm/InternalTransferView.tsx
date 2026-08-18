@@ -24,7 +24,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InventoryTable } from "@/components/scm/InventoryTable";
 import { NetworkGraph } from "@/components/scm/NetworkGraph";
 import { ResultPanel } from "@/components/scm/ResultPanel";
-import { demoScenarios, products, warehouses } from "@/data/mockData";
+import {
+  defaultAllocationParams,
+  demandNodeById,
+  demoScenarios,
+  products,
+  warehouses,
+} from "@/data/mockData";
+import { computeMrsl } from "@/lib/smart-fefo";
 import {
   evaluateTransfer,
   formatNum,
@@ -37,18 +44,30 @@ const DEFAULTS = {
   targetWarehouseId: "W-CT",
   productId: "P1",
   quantity: 100,
-  threshold: 30,
+  safetyBufferDays: defaultAllocationParams.safetyBufferDays,
 };
 
 export function InternalTransferView() {
   const [targetWarehouseId, setTarget] = useState(DEFAULTS.targetWarehouseId);
   const [productId, setProductId] = useState(DEFAULTS.productId);
   const [quantity, setQuantity] = useState(DEFAULTS.quantity);
-  const [threshold, setThreshold] = useState(DEFAULTS.threshold);
+  const [safetyBufferDays, setSafetyBuffer] = useState(DEFAULTS.safetyBufferDays);
   const [weightMode, setWeightMode] = useState<WeightMode>("time");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [animationKey, setAnimationKey] = useState(0);
+
+  // MRSL động: ngưỡng HSD tối thiểu tính riêng theo tốc độ bán của chính kho nhận hàng,
+  // thay cho ngưỡng cứng 30 ngày áp dụng cho mọi kho.
+  const mrsl = useMemo(
+    () =>
+      computeMrsl(demandNodeById.get(`DN-${targetWarehouseId}`)!, productId, quantity, {
+        ...defaultAllocationParams,
+        safetyBufferDays,
+      }),
+    [targetWarehouseId, productId, quantity, safetyBufferDays],
+  );
+  const threshold = mrsl.requiredDays;
 
   const preview = useMemo(
     () => evaluateTransfer({ targetWarehouseId, productId, quantity, threshold, weightMode }),
@@ -68,7 +87,7 @@ export function InternalTransferView() {
     setTarget(DEFAULTS.targetWarehouseId);
     setProductId(DEFAULTS.productId);
     setQuantity(DEFAULTS.quantity);
-    setThreshold(DEFAULTS.threshold);
+    setSafetyBuffer(DEFAULTS.safetyBufferDays);
     setWeightMode("time");
     setResult(null);
     setStepIndex(null);
@@ -80,7 +99,6 @@ export function InternalTransferView() {
     setTarget(s.targetWarehouseId);
     setProductId(s.productId);
     setQuantity(s.quantity);
-    setThreshold(s.threshold);
     setResult(null);
     setStepIndex(null);
   }
@@ -232,16 +250,30 @@ export function InternalTransferView() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Ngưỡng HSD tối thiểu: {threshold} ngày</Label>
+                  <Label>Safety Buffer: {safetyBufferDays} ngày</Label>
                   <Slider
-                    value={[threshold]}
+                    value={[safetyBufferDays]}
                     min={0}
-                    max={60}
+                    max={14}
                     step={1}
-                    onValueChange={(v) => setThreshold(v[0] ?? 30)}
+                    onValueChange={(v) => setSafetyBuffer(v[0] ?? 3)}
                     className="pt-3"
                   />
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">MRSL động của kho nhận</span>
+                  <Badge className="bg-success text-success-foreground hover:bg-success">
+                    {formatNum(threshold)} ngày
+                  </Badge>
+                </div>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">{mrsl.formula}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Không còn ngưỡng cứng 30 ngày: kho bán nhanh cần ít HSD hơn, kho bán chậm cần
+                  nhiều HSD hơn — tránh &quot;FEFO mù quáng&quot;.
+                </p>
               </div>
 
               <Button className="w-full gap-2" onClick={run}>
