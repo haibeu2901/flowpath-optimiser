@@ -70,6 +70,11 @@ export function CustomerOrderView() {
 
   const servingId = result.best?.warehouseId ?? result.split?.[0]?.plan.warehouseId ?? null;
 
+  // Cảnh báo cấp lô: kho nguồn có ít nhất 1 lô không đủ số lượng đơn.
+  const sourceHasPartialBatch =
+    !!servingId &&
+    result.candidates.some((c) => c.warehouseId === servingId && !c.enoughQty);
+
   // Giá: lô cận date được giảm giá để khuyến khích tiêu thụ sớm.
   const chosen = result.best;
   const isPromo =
@@ -107,8 +112,9 @@ export function CustomerOrderView() {
           <CardContent className="space-y-3">
             <div className="rounded-xl border border-border bg-card p-2">
               <NetworkGraph
-                targetWarehouseId={nearestWarehouseId}
+                targetWarehouseId={nearestWarehouseId === servingId ? "" : nearestWarehouseId}
                 sourceWarehouseId={servingId}
+                partialStock={sourceHasPartialBatch}
                 weightLabelMode="distance"
                 animationKey={0}
                 orderPoint={{ label: node.name, position: node.position }}
@@ -122,7 +128,8 @@ export function CustomerOrderView() {
             </div>
             <p className="text-xs text-muted-foreground">
               Chọn kho nguồn bằng <strong>Haversine O(1)</strong> (nét đứt cam = chặng giao thực
-              tế). Dijkstra chỉ dùng ở bước 11 — Delivery Routing.
+              tế). Dijkstra chỉ dùng ở bước 11 — Delivery Routing. Cảnh báo thiếu số lượng ở cấp lô
+              xem tại bảng so sánh Plan.
             </p>
           </CardContent>
         </Card>
