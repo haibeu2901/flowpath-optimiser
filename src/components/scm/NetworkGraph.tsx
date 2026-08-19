@@ -288,6 +288,7 @@ function WarehouseNode({
   isCurrent,
   relaxed,
   stepDist,
+  partialStock,
 }: {
   warehouse: Warehouse;
   isTarget: boolean;
@@ -297,14 +298,15 @@ function WarehouseNode({
   isCurrent: boolean;
   relaxed: boolean;
   stepDist?: number | undefined;
+  partialStock?: boolean;
 }) {
   const { x, y } = w.position;
   const r = w.type === "central" ? 26 : 21;
 
-  const fill = isTarget
-    ? "fill-destructive"
-    : isSource
-      ? "fill-success"
+  const fill = isSource
+    ? "fill-success"
+    : isTarget
+      ? "fill-destructive"
       : isCurrent
         ? "fill-warning"
         : visited
@@ -320,7 +322,7 @@ function WarehouseNode({
 
   // Xếp chồng badge theo tầng để không đè lên nhau khi node vừa là đích vừa là nguồn.
   const badges: { label: string; className: string; textClass: string; width: number }[] = [];
-  if (isTarget)
+  if (isTarget && !isSource)
     badges.push({
       label: "THIẾU HÀNG",
       className: "fill-destructive",
@@ -329,10 +331,10 @@ function WarehouseNode({
     });
   if (isSource)
     badges.push({
-      label: "KHO NGUỒN",
+      label: partialStock ? "⚠ KHO NGUỒN" : "KHO NGUỒN",
       className: "fill-success",
       textClass: "fill-success-foreground",
-      width: 70,
+      width: partialStock ? 86 : 70,
     });
 
   return (
