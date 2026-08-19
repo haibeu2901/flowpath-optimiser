@@ -16,6 +16,8 @@ interface Props {
   /** Kho được nối nét đứt tới điểm đặt đơn (chặng giao cuối) */
   lastMileWarehouseId?: string | null | undefined;
   lastMileLabel?: string | undefined;
+  /** Kho nguồn có ít nhất 1 lô không đủ số lượng — cảnh báo nhẹ ở cấp kho. */
+  partialStock?: boolean | undefined;
 }
 
 const WIDTH = 620;
@@ -65,6 +67,7 @@ export function NetworkGraph({
   orderPoint,
   lastMileWarehouseId,
   lastMileLabel,
+  partialStock,
 }: Props) {
   const hasPath = !!path && path.length > 1;
   const motionPath = hasPath
@@ -199,6 +202,7 @@ export function NetworkGraph({
             isCurrent={step?.currentId === w.id}
             relaxed={relaxedIds.has(w.id)}
             stepDist={step ? step.dist[w.id] : undefined}
+            partialStock={!!partialStock && w.id === sourceWarehouseId}
           />
         ))}
 
