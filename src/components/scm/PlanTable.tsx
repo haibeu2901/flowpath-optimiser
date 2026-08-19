@@ -20,7 +20,7 @@ export function PlanTable({ result }: { result: AllocationResult }) {
       <table className="w-full text-xs">
         <thead className="sticky top-0 bg-secondary">
           <tr>
-            {["Kho", "Lô", "km", "HSD tới nơi", "Norm_D", "Norm_E", "Score"].map((h) => (
+            {["Kho", "Lô", "SL", "km", "HSD tới nơi", "Norm_D", "Norm_E", "Score"].map((h) => (
               <th key={h} className="px-2.5 py-2 text-left font-semibold">
                 {h}
               </th>
@@ -55,6 +55,17 @@ export function PlanTable({ result }: { result: AllocationResult }) {
                   </span>
                 </td>
                 <td className="px-2.5 py-2 font-mono">{p.batch.batchCode}</td>
+                <td className="px-2.5 py-2">
+                  {p.enoughQty ? (
+                    <span className="text-muted-foreground">
+                      {p.availableQty}/{result.quantity}
+                    </span>
+                  ) : (
+                    <Badge className="bg-warning text-warning-foreground hover:bg-warning">
+                      SL không đủ ({p.availableQty}/{result.quantity})
+                    </Badge>
+                  )}
+                </td>
                 <td className="px-2.5 py-2">{formatNum(p.distanceKm)}</td>
                 <td className="px-2.5 py-2">
                   {formatNum(p.remainingOnArrival)} · {formatDate(p.batch.expiryDate)}
