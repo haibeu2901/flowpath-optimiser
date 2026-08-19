@@ -77,16 +77,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Điều chuyển FMCG HSD ngắn — Dijkstra & FEFO" },
-      { name: "description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Dijkstra và chọn lô theo FEFO." },
+      { title: "Điều chuyển FMCG HSD ngắn — Haversine + Dijkstra & FEFO" },
+      { name: "description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Haversine + Dijkstra và chọn lô theo FEFO." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Điều chuyển FMCG HSD ngắn — Dijkstra & FEFO" },
-      { property: "og:description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Dijkstra và chọn lô theo FEFO." },
+      { property: "og:title", content: "Điều chuyển FMCG HSD ngắn — Haversine + Dijkstra & FEFO" },
+      { property: "og:description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Haversine + Dijkstra và chọn lô theo FEFO." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Điều chuyển FMCG HSD ngắn — Dijkstra & FEFO" },
-      { name: "twitter:description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Dijkstra và chọn lô theo FEFO." },
+      { name: "twitter:title", content: "Điều chuyển FMCG HSD ngắn — Haversine + Dijkstra & FEFO" },
+      { name: "twitter:description", content: "Demo hệ thống quản lý chuỗi cung ứng FMCG hạn sử dụng ngắn: tìm kho nguồn, tối ưu tuyến bằng Haversine + Dijkstra và chọn lô theo FEFO." },
     ],
     links: [
       {
