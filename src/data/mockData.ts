@@ -293,7 +293,7 @@ export const orderScenarios: OrderScenario[] = [
   {
     id: "B",
     label: "Kịch bản B",
-    description: "Kho gần nhất hết hàng → Dijkstra tìm kho thay thế, so sánh 2 phương án",
+    description: "Kho gần nhất hết hàng → Haversine + Dijkstra tìm kho thay thế, so sánh 2 phương án",
     orderLocationId: "OL2",
     productId: "P2",
     quantity: 300,

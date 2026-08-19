@@ -12,19 +12,19 @@ import { TODAY } from "@/data/mockData";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Điều chuyển & đặt đơn FMCG HSD ngắn — Dijkstra, FEFO" },
+      { title: "Điều chuyển & đặt đơn FMCG HSD ngắn — Haversine + Dijkstra, FEFO" },
       {
         name: "description",
         content:
-          "Demo chuỗi cung ứng FMCG hạn sử dụng ngắn: luân chuyển kho theo FEFO, chọn kho phục vụ đơn hàng bằng Dijkstra và chọn lô theo yêu cầu khách hàng.",
+          "Demo chuỗi cung ứng FMCG hạn sử dụng ngắn: luân chuyển kho theo FEFO, chọn kho phục vụ đơn hàng bằng Haversine + Dijkstra và chọn lô theo yêu cầu khách hàng.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:title", content: "Điều chuyển & đặt đơn FMCG HSD ngắn — Dijkstra, FEFO" },
+      { property: "og:title", content: "Điều chuyển & đặt đơn FMCG HSD ngắn — Haversine + Dijkstra, FEFO" },
       {
         property: "og:description",
         content:
-          "Demo chuỗi cung ứng FMCG hạn sử dụng ngắn: luân chuyển kho theo FEFO, chọn kho phục vụ đơn hàng bằng Dijkstra và chọn lô theo yêu cầu khách hàng.",
+          "Demo chuỗi cung ứng FMCG hạn sử dụng ngắn: luân chuyển kho theo FEFO, chọn kho phục vụ đơn hàng bằng Haversine + Dijkstra và chọn lô theo yêu cầu khách hàng.",
       },
     ],
   }),
@@ -48,7 +48,7 @@ function Dashboard() {
                 Hệ thống chuỗi cung ứng FMCG hạn sử dụng ngắn
               </h1>
               <p className="text-sm opacity-85">
-                Dijkstra tối ưu tuyến · FEFO giảm lãng phí · Cân bằng lợi ích khách hàng
+                Haversine + Dijkstra tối ưu tuyến · FEFO giảm lãng phí · Cân bằng lợi ích khách hàng (đủ HSD để bán) & nhà phân phối (giảm chi phí logistics, tăng fill rate)
               </p>
             </div>
           </div>
